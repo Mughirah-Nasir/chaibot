@@ -1,0 +1,61 @@
+{
+  "name": "chaibot",
+  "version": "1.0.0",
+  "description": "A scam/red-flag detector and proposal assistant for freelancers on platforms like Upwork and Fiverr. This is the verified Node.js core; it is designed to be wrapped by a Laravel UI later.",
+  "type": "module",
+  "bin": {
+    "chaibot": "src/cli.js"
+  },
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage",
+    "lint": "eslint .",
+    "format": "prettier --write \"src/**/*.js\" \"test/**/*.js\" \"*.js\"",
+    "format:check": "prettier --check \"src/**/*.js\" \"test/**/*.js\" \"*.js\"",
+    "chaibot": "node src/cli.js",
+    "api": "node src/api/server.js"
+  },
+  "keywords": [
+    "freelancing",
+    "scam-detection",
+    "fraud-detection",
+    "upwork",
+    "fiverr",
+    "proposal",
+    "cli",
+    "pakistan"
+  ],
+  "author": "Mughirah Nasir <mnasir.bee25seecs@seecs.edu.pk>",
+  "license": "MIT",
+  "homepage": "https://github.com/Mughirah-Nasir/chaibot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Mughirah-Nasir/chaibot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Mughirah-Nasir/chaibot/issues"
+  },
+  "files": [
+    "src/",
+    "examples/",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "AUTHENTICITY.md",
+    "PROVENANCE.md",
+    "CERTIFICATE.html"
+  ],
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "eslint": "^9.39.4",
+    "prettier": "^3.8.4"
+  }
+}

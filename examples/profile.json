@@ -1,0 +1,11 @@
+{
+  "name": "Ayesha Khan",
+  "skills": ["React", "TypeScript", "Node.js", "REST APIs"],
+  "yearsExperience": 3,
+  "highlights": [
+    "Built several analytics dashboards with reusable chart components",
+    "Integrated REST and GraphQL APIs with authentication"
+  ],
+  "rate": 25,
+  "portfolio": "https://example.com/portfolio"
+}
