@@ -168,3 +168,8 @@ This project was designed and directed by me and built in pair-programming sessi
 ## License
 
 [MIT](LICENSE) © 2026 Mughirah Nasir
+
+## Local verification
+
+This repository is intended to be easy to inspect and verify locally. After cloning, run the documented install and test commands before using the tool in your own workflow.
+
