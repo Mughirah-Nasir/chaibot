@@ -173,3 +173,7 @@ This project was designed and directed by me and built in pair-programming sessi
 
 This repository is intended to be easy to inspect and verify locally. After cloning, run the documented install and test commands before using the tool in your own workflow.
 
+
+## Documentation maintenance
+
+This repository is maintained as a small, reviewable public project. Setup steps, verification commands, limitations, and security notes should stay clear enough for someone to inspect the project quickly before running it.
