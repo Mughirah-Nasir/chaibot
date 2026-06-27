@@ -177,3 +177,9 @@ This repository is intended to be easy to inspect and verify locally. After clon
 ## Documentation maintenance
 
 This repository is maintained as a small, reviewable public project. Setup steps, verification commands, limitations, and security notes should stay clear enough for someone to inspect the project quickly before running it.
+
+## Future improvements
+
+- Add more scam-pattern examples from realistic freelance postings.
+- Add user-editable risk thresholds for cautious vs aggressive filtering.
+- Add exportable proposal drafts with clear risk warnings attached.
