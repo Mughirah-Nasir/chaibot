@@ -53,6 +53,22 @@ test("unrealistic_pay fires on huge daily pay with no experience", () => {
   assert.equal(fire("unrealistic_pay", "rate is $30 per hour for senior work"), null);
 });
 
+// Regression: the rule previously only matched $-denominated amounts, so
+// PKR-denominated too-good-to-be-true pay (the primary audience's currency)
+// fired nothing even though the normalizer extracts PKR amounts.
+test("unrealistic_pay fires on huge PKR-denominated pay", () => {
+  assert.ok(fire("unrealistic_pay", "earn Rs 50,000 per day working from home"));
+  assert.ok(fire("unrealistic_pay", "PKR 200,000 weekly, no experience"));
+  assert.ok(fire("unrealistic_pay", "we pay rs. 25000 daily for simple typing"));
+  assert.ok(fire("unrealistic_pay", "Rs 15,000 per hour guaranteed"));
+});
+
+test("unrealistic_pay ignores plausible PKR budgets and monthly salaries", () => {
+  assert.equal(fire("unrealistic_pay", "budget is PKR 20,000 for the whole project"), null);
+  assert.equal(fire("unrealistic_pay", "salary: earn Rs 150,000 per month with benefits"), null);
+  assert.equal(fire("unrealistic_pay", "rate around rs 2,000 per day for data entry"), null);
+});
+
 test("off_platform_contact fires on whatsapp and on embedded email", () => {
   assert.ok(fire("off_platform_contact", "contact me on WhatsApp to begin"));
   const viaEmail = fire("off_platform_contact", "send your application to hire@elsewhere.co");

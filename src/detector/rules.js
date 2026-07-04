@@ -76,10 +76,18 @@ const unrealisticPay = {
   reason: "Promises unusually high pay for little work or vague tasks",
   test(p) {
     const ev = phrase(p, [
+      // USD-denominated
       /\$\s?\d{3,}\s*(?:\/|per\s+)?(?:hour|hr)\b/,
       /\bearn\s+\$?\d{3,}\s+(?:a\s+)?(?:day|daily|per\s+day)\b/,
       /\b(easy|quick)\s+money\b|\bno\s+experience\s+(?:needed|required)\b.*\b\$?\d{2,}/,
       /\b\$?\d{3,}\s+(?:a\s+|per\s+)?week\s+(?:part[\s-]?time|for\s+\d+\s+hours)\b/,
+      // PKR-denominated (Rs / PKR / ₨). Five-figure-plus daily, weekly, or
+      // hourly pay is far above realistic entry-level rates for the
+      // freelancers this tool targets. Monthly salaries are deliberately not
+      // matched: "earn Rs 150,000 a month" can be a legitimate job.
+      /\b(?:pkr|rs\.?|₨)\s?\d{2}[\d,]{3,}\s*(?:\/\s*|per\s+|a\s+|each\s+)?(?:day|daily|week|weekly)\b/,
+      /\b(?:pkr|rs\.?|₨)\s?\d{2}[\d,]{3,}\s*(?:\/\s*|per\s+|an?\s+)?(?:hour|hr|hourly)\b/,
+      /\bearn\s+(?:pkr|rs\.?|₨)\s?\d{2}[\d,]{3,}(?![\d,]*\s*(?:a\s+|per\s+)?month)/,
     ]);
     return ev ? { evidence: ev } : null;
   },
