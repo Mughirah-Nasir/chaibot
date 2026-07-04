@@ -1,13 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createServer } from "node:http";
+import { createServer, request } from "node:http";
 
 import { createApp } from "../src/api/server.js";
 
 // Spin up the app on an ephemeral port for each test group.
-function withServer(run) {
+function withServer(run, appOpts) {
   return new Promise((resolve, reject) => {
-    const server = createServer(createApp());
+    const server = createServer(createApp(appOpts));
     server.listen(0, "127.0.0.1", async () => {
       const base = `http://127.0.0.1:${server.address().port}`;
       try {
@@ -96,6 +96,61 @@ test("POST /propose returns an offline draft for a legit posting", async () => {
     assert.equal(data.result.blocked, false);
     assert.equal(data.result.source, "offline");
     assert.ok(data.result.proposal.includes("Sam"));
+  });
+});
+
+test("POST /propose rejects a body-supplied provider unless allow-listed", async () => {
+  await withServer(async (base) => {
+    const res = await fetch(`${base}/propose`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: LEGIT, provider: "replay:/etc/passwd.json" }),
+    });
+    assert.equal(res.status, 403);
+    const data = await res.json();
+    assert.match(data.error, /not enabled/);
+  });
+});
+
+test("POST /propose accepts an allow-listed provider kind", async () => {
+  await withServer(
+    async (base) => {
+      const res = await fetch(`${base}/propose`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          text: LEGIT,
+          profile: { name: "Sam" },
+          provider: "replay:examples/cassette.json",
+        }),
+      });
+      // The cassette has no entry for this prompt, so the orchestrator falls
+      // back to the offline draft -- but the provider itself was permitted.
+      assert.equal(res.status, 200);
+      const data = await res.json();
+      assert.equal(data.result.blocked, false);
+    },
+    { allowedProviders: ["replay"] },
+  );
+});
+
+test("requests with a non-local Host header are rejected", async () => {
+  await withServer(async (base) => {
+    const { port } = new URL(base);
+    const status = await new Promise((resolve, reject) => {
+      // fetch() forbids overriding Host, so use a raw http request to spoof
+      // what a DNS-rebinding page would send.
+      const req = request(
+        { host: "127.0.0.1", port, path: "/health", headers: { host: "evil.example.com" } },
+        (res) => {
+          res.resume();
+          resolve(res.statusCode);
+        },
+      );
+      req.on("error", reject);
+      req.end();
+    });
+    assert.equal(status, 403);
   });
 });
 

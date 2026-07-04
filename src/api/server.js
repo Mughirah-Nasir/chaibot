@@ -12,6 +12,15 @@
  *   GET  /rules                  -> the red-flag rules
  *   POST /check    { text }      -> verdict
  *   POST /propose  { text, profile?, provider?, allowRisky? } -> proposal result
+ *
+ * Hardening (cheap, but deliberate):
+ *   - The Host header must be localhost/127.0.0.1/[::1]; anything else gets a
+ *     403. This blocks DNS-rebinding pages from driving the local server.
+ *   - The `provider` field of POST /propose is disabled unless the provider
+ *     kind was explicitly allow-listed at startup (`chaibot serve --providers
+ *     openai,anthropic`). Otherwise any local caller could spend the API keys
+ *     in the server's environment, or use `replay:<path>` to probe local
+ *     files.
  */
 
 import { createServer } from "node:http";
@@ -24,9 +33,19 @@ import { ProviderError } from "../providers/base.js";
 
 const MAX_BODY = 100 * 1024; // 100 KB cap on request bodies
 
-export function createApp() {
+export const PROVIDER_KINDS = ["replay", "openai", "anthropic"];
+
+/**
+ * @param {object} [opts]
+ * @param {string[]} [opts.allowedProviders]  provider kinds POST /propose may
+ *   instantiate from the request body (default: none)
+ */
+export function createApp({ allowedProviders = [] } = {}) {
   return async function handler(req, res) {
     try {
+      if (!isLocalHostHeader(req.headers.host)) {
+        return send(res, 403, { error: "forbidden Host header" });
+      }
       const url = new URL(req.url, "http://localhost");
 
       if (req.method === "GET" && url.pathname === "/health") {
@@ -58,8 +77,15 @@ export function createApp() {
         const { verdict, posting } = analyzePosting(body.text);
         let provider;
         if (body.provider) {
+          const spec = String(body.provider);
+          const kind = spec.split(":")[0].trim().toLowerCase();
+          if (!allowedProviders.includes(kind)) {
+            return send(res, 403, {
+              error: `provider kind '${kind}' is not enabled on this server (start it with --providers to allow it)`,
+            });
+          }
           try {
-            provider = createProvider(String(body.provider));
+            provider = createProvider(spec);
           } catch (err) {
             return send(res, 400, { error: err.message });
           }
@@ -82,12 +108,31 @@ export function createApp() {
   };
 }
 
-export function startServer({ port = 8100, host = "127.0.0.1" } = {}) {
-  const server = createServer(createApp());
+export function startServer({ port = 8100, host = "127.0.0.1", allowedProviders = [] } = {}) {
+  const server = createServer(createApp({ allowedProviders }));
   server.listen(port, host, () => {
-    process.stderr.write(`ChaiBot API on http://${host}:${port} (local use only, no auth)\n`);
+    const providers = allowedProviders.length > 0 ? allowedProviders.join(",") : "none";
+    process.stderr.write(
+      `ChaiBot API on http://${host}:${port} (local use only, no auth; providers: ${providers})\n`,
+    );
   });
   return server;
+}
+
+// Only accept requests addressed to the local machine. A browser lured to a
+// DNS-rebinding page sends the attacker's hostname in Host, so this check
+// stops such pages from reaching the API even though it binds to 127.0.0.1.
+function isLocalHostHeader(host) {
+  // The bind address already restricts who can connect; a missing Host header
+  // (bare HTTP/1.0 client, curl --http1.0) is fine.
+  if (!host) return true;
+  let hostname;
+  try {
+    hostname = new URL(`http://${host}`).hostname;
+  } catch {
+    return false;
+  }
+  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "[::1]";
 }
 
 function send(res, status, obj) {

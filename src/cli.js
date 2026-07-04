@@ -128,8 +128,26 @@ async function cmdServe(args) {
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new UserError(`invalid --port: ${flags.port}`);
   }
-  const { startServer } = await import("./api/server.js");
-  startServer({ port });
+  const { startServer, PROVIDER_KINDS } = await import("./api/server.js");
+  // Providers are opt-in: without --providers, POST /propose ignores the
+  // body's `provider` field so callers can't spend this environment's API
+  // keys or read local cassette files.
+  let allowedProviders = [];
+  if (flags.providers) {
+    if (flags.providers === true) {
+      throw new UserError(`--providers needs a value (e.g. --providers replay,openai)`);
+    }
+    allowedProviders = String(flags.providers)
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean);
+    for (const kind of allowedProviders) {
+      if (!PROVIDER_KINDS.includes(kind)) {
+        throw new UserError(`unknown provider kind '${kind}' (use ${PROVIDER_KINDS.join(", ")})`);
+      }
+    }
+  }
+  startServer({ port, allowedProviders });
   return 0; // server keeps the process alive
 }
 
@@ -214,7 +232,7 @@ Usage:
   chaibot check   <file|->            Score a posting for scam red flags
   chaibot propose <file|-> [options]  Draft a proposal for a posting
   chaibot rules                       List the red-flag rules
-  chaibot serve   [--port N]          Start the optional local API
+  chaibot serve   [options]           Start the optional local API
   chaibot --version
 
 Options for 'check':
@@ -224,6 +242,11 @@ Options for 'propose':
   --profile <file.json>  Freelancer profile (name, skills[], yearsExperience, ...)
   --provider <spec>      LLM polish: replay:cassette.json | openai:MODEL | anthropic:MODEL
   --allow-risky          Build a proposal even if the posting is high-risk
+
+Options for 'serve':
+  --port N               Port to listen on (default 8100)
+  --providers <kinds>    Comma-separated provider kinds POST /propose may use
+                         (replay, openai, anthropic). Default: none.
 
 Postings are read from a file or stdin ("-"). 'check' exits 1 on high risk.
 This is the verified Node core; a Laravel UI can wrap it later.
