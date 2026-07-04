@@ -27,9 +27,18 @@ or `replay` path.
 
 ## The local API
 
-`chaibot serve` binds to `127.0.0.1`, has no authentication, and can invoke
-paid providers if a request asks it to. It is intended for local development
-only. Do not expose it to a public network.
+`chaibot serve` binds to `127.0.0.1` and has no authentication. It is intended
+for local development only. Do not expose it to a public network.
+
+Two mitigations reduce what an unwanted caller can do:
+
+- Requests whose `Host` header is not `localhost`/`127.0.0.1`/`[::1]` are
+  rejected with 403, which stops DNS-rebinding pages in a local browser from
+  driving the API.
+- The `provider` field of `POST /propose` is **disabled by default**, so a
+  caller cannot spend the API keys in the server's environment or point the
+  `replay` provider at arbitrary local files. Opt specific kinds in with
+  `chaibot serve --providers replay,openai,anthropic`.
 
 ## No warranty / not a guarantee
 

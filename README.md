@@ -5,7 +5,7 @@
 [![CI](https://github.com/Mughirah-Nasir/chaibot/actions/workflows/ci.yml/badge.svg)](https://github.com/Mughirah-Nasir/chaibot/actions)
 [![Node 18+](https://img.shields.io/badge/node-18%2B-blue)](https://nodejs.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-71%20passed-brightgreen)](test/)
+[![Tests](https://img.shields.io/badge/tests-83%20passed-brightgreen)](test/)
 [![Dependencies](https://img.shields.io/badge/runtime%20deps-0-success)](package.json)
 
 > **What this release is.** This is the **verified Node.js core** — the scam-detection engine and proposal assistant, with a CLI and an optional local API. It is designed so a **Laravel + Vue UI can wrap it later** (that's the longer-term plan), but this repository is *not* a full Laravel production app, and it doesn't pretend to be. The core is what's built, tested, and honest here.
@@ -112,6 +112,8 @@ curl -s localhost:8100/check -H 'content-type: application/json' \
 
 Endpoints: `GET /health`, `GET /rules`, `POST /check {text}`, `POST /propose {text, profile?, provider?, allowRisky?}`.
 
+Two pieces of hardening on top of the localhost bind: requests with a non-local `Host` header are rejected (blocks DNS-rebinding pages), and the `provider` field of `POST /propose` is **disabled by default** — enable specific kinds with `chaibot serve --providers replay,openai,anthropic` if you want callers to be able to use them (they can spend the API keys in the server's environment).
+
 ## The rules
 
 | Rule | Category | Weight | Fires when… |
@@ -121,7 +123,7 @@ Endpoints: `GET /health`, `GET /rules`, `POST /check {text}`, `POST /propose {te
 | `overpayment_refund` | payment | 35 | check-and-refund-the-difference language |
 | `off_platform_contact` | contact | 28 | pushes to WhatsApp/Telegram/email before hiring |
 | `odd_payment_rail` | payment | 22 | gift-cards / crypto / wire-only payment |
-| `unrealistic_pay` | payment | 20 | implausibly high pay for little/no-experience work |
+| `unrealistic_pay` | payment | 20 | implausibly high pay (USD or PKR) for little/no-experience work |
 | `instant_hire` | scope | 14 | "you're hired", no interview/test/portfolio |
 | `urgency_pressure` | scope | 12 | urgency / limited-slots pressure |
 | `vague_scope` | scope | 10 | very short, no concrete deliverables |
@@ -144,7 +146,7 @@ The main design decisions and the reasoning behind them:
 ## Limitations (honest)
 
 - **Heuristics, not proof.** A high score means "matches common scam patterns", not "definitely a scam"; a low score means "no common red flags found", not "definitely safe". Always apply your own judgment. ChaiBot is a decision aid.
-- **English-focused.** The rules target English-language postings (with some Roman-Urdu-adjacent phrasing). Postings in other languages or heavy transliteration may be under-detected.
+- **English-focused.** The rules target English-language postings. PKR-denominated pay (`Rs` / `PKR`) is recognized by the `unrealistic_pay` rule, but there are **no Urdu or Roman-Urdu patterns yet** — postings in other languages or heavy transliteration will be under-detected.
 - **Pattern-based, so evadable.** A scammer who avoids the known phrasings can score low. The rules catch common, lazy scams well; they are not adversarially robust.
 - **Single-turn.** It analyzes one posting (or one proposal draft) at a time. It does not track a conversation, verify a client's history, or check platform reputation.
 - **The proposal assistant is a drafting aid.** Offline output is templated; even LLM-polished output should be reviewed and personalized before you send it.
@@ -154,7 +156,7 @@ The main design decisions and the reasoning behind them:
 
 ```bash
 npm install
-npm test            # 71 tests, node:test runner
+npm test            # 83 tests, node:test runner
 npm run lint        # eslint
 npm run format:check
 ```

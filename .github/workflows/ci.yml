@@ -30,5 +30,8 @@ jobs:
         run: npm run format:check
       - name: Test
         run: npm test
+      - name: Coverage report
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == '20'
+        run: npm run test:coverage
       - name: Package check
         run: npm pack --dry-run

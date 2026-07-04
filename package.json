@@ -50,8 +50,7 @@
     "CHANGELOG.md",
     "CONTRIBUTING.md",
     "AUTHENTICITY.md",
-    "PROVENANCE.md",
-    "CERTIFICATE.html"
+    "PROVENANCE.md"
   ],
   "devDependencies": {
     "@eslint/js": "^9.39.4",
