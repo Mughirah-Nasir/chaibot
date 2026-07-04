@@ -98,3 +98,25 @@ test("unknown command exits 2 and prints help", () => {
   assert.equal(r.status, 2);
   assert.match(r.stderr, /unknown command/);
 });
+
+// Regression: unknown flags used to be silently ignored, so a typo like
+// --provdier just did nothing.
+test("unknown flag exits 2 with a clear error", () => {
+  const r = run(["check", "-", "--provdier"], LEGIT);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /unknown flag '--provdier'/);
+});
+
+// Regression: a value flag followed by another flag used to swallow it
+// ("--profile --provider x" set profile to true instead of erroring).
+test("value flag without a value exits 2", () => {
+  const r = run(["propose", "-", "--profile", "--provider", "replay:x.json"], LEGIT);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /--profile needs a value/);
+});
+
+test("serve rejects an unknown provider kind with exit 2", () => {
+  const r = run(["serve", "--providers", "carrierpigeon"]);
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /unknown provider kind 'carrierpigeon'/);
+});

@@ -6,12 +6,16 @@
  *   chaibot check  <file|->            score a job posting for scam red flags
  *   chaibot propose <file|-> [opts]    draft a proposal (offline, or --provider)
  *   chaibot rules                      list the detector's red-flag rules
- *   chaibot serve [--port N]           start the optional local API
+ *   chaibot serve [--port N] [--providers k,...]   start the optional local API
  *   chaibot --help | --version
  *
- * Postings are read from a file path or from stdin (use "-"). User mistakes
- * produce a one-line "error: ..." and exit 2 -- never a stack trace. A
- * high-risk verdict from `check` exits 1 so it can gate scripts.
+ * Postings are read from a file path or from stdin (use "-").
+ *
+ * Exit codes (distinct so wrapper scripts can tell outcomes apart):
+ *   0  success / low risk
+ *   1  high-risk verdict from `check`, or a blocked proposal
+ *   2  user error (bad flags, missing file) -- one line, never a stack trace
+ *   3  unexpected internal error (a chaibot bug, not a scam verdict)
  */
 
 import { readFileSync } from "node:fs";
@@ -62,7 +66,7 @@ function readInput(arg) {
 }
 
 function cmdCheck(args) {
-  const { positionals, flags } = parseArgs(args);
+  const { positionals, flags } = parseArgs(args, { booleans: ["json"] });
   const text = readInput(positionals[0]);
   const { verdict } = analyzePosting(text);
 
@@ -76,7 +80,10 @@ function cmdCheck(args) {
 }
 
 async function cmdPropose(args) {
-  const { positionals, flags } = parseArgs(args);
+  const { positionals, flags } = parseArgs(args, {
+    booleans: ["allow-risky"],
+    strings: ["profile", "provider"],
+  });
   const text = readInput(positionals[0]);
   const { verdict, posting } = analyzePosting(text);
 
@@ -123,20 +130,17 @@ function cmdRules() {
 }
 
 async function cmdServe(args) {
-  const { flags } = parseArgs(args);
+  const { flags } = parseArgs(args, { strings: ["port", "providers"] });
   const port = Number(flags.port ?? 8100);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new UserError(`invalid --port: ${flags.port}`);
   }
   const { startServer, PROVIDER_KINDS } = await import("./api/server.js");
-  // Providers are opt-in: without --providers, POST /propose ignores the
+  // Providers are opt-in: without --providers, POST /propose rejects the
   // body's `provider` field so callers can't spend this environment's API
   // keys or read local cassette files.
   let allowedProviders = [];
   if (flags.providers) {
-    if (flags.providers === true) {
-      throw new UserError(`--providers needs a value (e.g. --providers replay,openai)`);
-    }
     allowedProviders = String(flags.providers)
       .split(",")
       .map((s) => s.trim().toLowerCase())
@@ -190,20 +194,30 @@ function truncate(s, n) {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
 
-// Minimal flag parser: --key value, --flag, and positionals.
-function parseArgs(args) {
+// Minimal flag parser: --key value, --flag, and positionals. Each command
+// declares which flags it accepts; anything else is a user error rather than
+// being silently ignored (a typo like --provdier used to do nothing), and a
+// value flag followed by another flag no longer swallows it as its value.
+function parseArgs(args, spec = {}) {
+  const booleans = spec.booleans ?? [];
+  const strings = spec.strings ?? [];
   const flags = {};
   const positionals = [];
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a.startsWith("--")) {
       const key = a.slice(2);
-      const next = args[i + 1];
-      if (next !== undefined && !next.startsWith("--")) {
+      if (booleans.includes(key)) {
+        flags[key] = true;
+      } else if (strings.includes(key)) {
+        const next = args[i + 1];
+        if (next === undefined || next.startsWith("--")) {
+          throw new UserError(`--${key} needs a value`);
+        }
         flags[key] = next;
         i++;
       } else {
-        flags[key] = true;
+        throw new UserError(`unknown flag '--${key}'`);
       }
     } else {
       positionals.push(a);
@@ -248,18 +262,14 @@ Options for 'serve':
   --providers <kinds>    Comma-separated provider kinds POST /propose may use
                          (replay, openai, anthropic). Default: none.
 
-Postings are read from a file or stdin ("-"). 'check' exits 1 on high risk.
+Postings are read from a file or stdin ("-").
+
+Exit codes: 0 ok / low risk · 1 high risk or blocked proposal ·
+2 user error · 3 unexpected internal error.
 This is the verified Node core; a Laravel UI can wrap it later.
 `,
   );
   return 0;
-}
-
-class ExitError extends Error {
-  constructor(code) {
-    super(`exit ${code}`);
-    this.code = code;
-  }
 }
 
 main(process.argv.slice(2))
@@ -269,9 +279,10 @@ main(process.argv.slice(2))
       process.stderr.write(`error: ${err.message}\n`);
       process.exit(2);
     }
-    if (err instanceof ExitError) process.exit(err.code);
+    // 3, not 1: exit 1 means "high risk detected", and a wrapper script must
+    // be able to tell a scam verdict apart from a chaibot crash.
     process.stderr.write(`error: ${err.stack || err.message}\n`);
-    process.exit(1);
+    process.exit(3);
   });
 
 export { main };
