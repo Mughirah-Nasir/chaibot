@@ -16,8 +16,15 @@ const MONEY_RE =
 // Contact handles that imply moving off-platform.
 const EMAIL_RE = /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/gi;
 const URL_RE = /\bhttps?:\/\/[^\s)]+/gi;
-const WHATSAPP_RE = /\b(whats?app|wa\.me|whatsapp number)\b/gi;
-const TELEGRAM_RE = /\b(telegram|t\.me|telegram handle|@[a-z0-9_]{4,})\b/gi;
+// NOTE: these two are used with .test(), so they must NOT carry the /g flag.
+// A global regex is stateful (lastIndex persists on the module-level object
+// between calls), which made identical postings score differently across
+// consecutive normalizePosting() calls.
+const WHATSAPP_RE = /\b(whats?app|wa\.me|whatsapp number)\b/i;
+// Telegram: the app name/link, or a standalone @handle. The handle branch
+// requires start-of-string or whitespace before the "@" so it does not match
+// the domain part of an email address (e.g. "test@gmail.com").
+const TELEGRAM_RE = /\b(telegram|t\.me)\b|(?<=^|\s)@[a-z0-9_]{4,}\b/i;
 // Phone-ish: international or local sequences, loosely.
 const PHONE_RE = /(?:\+?\d[\d\s().-]{7,}\d)/g;
 
@@ -37,6 +44,11 @@ export function normalizePosting(raw) {
     (p) => digitsOf(p).length >= 9 && digitsOf(p).length <= 15,
   );
 
+  // Test once and reuse the booleans so hasOffPlatformContact can never
+  // disagree with the mentions* fields.
+  const mentionsWhatsApp = WHATSAPP_RE.test(lower);
+  const mentionsTelegram = TELEGRAM_RE.test(lower);
+
   return {
     raw: text,
     text: collapsed, // lower-cased, whitespace-collapsed; what most rules match on
@@ -47,11 +59,11 @@ export function normalizePosting(raw) {
     emails,
     urls,
     phones,
-    mentionsWhatsApp: WHATSAPP_RE.test(lower),
-    mentionsTelegram: TELEGRAM_RE.test(lower),
+    mentionsWhatsApp,
+    mentionsTelegram,
     // Convenience: does the text contain any explicit off-platform contact?
     hasOffPlatformContact:
-      emails.length > 0 || phones.length > 0 || WHATSAPP_RE.test(lower) || TELEGRAM_RE.test(lower),
+      emails.length > 0 || phones.length > 0 || mentionsWhatsApp || mentionsTelegram,
   };
 }
 

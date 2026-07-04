@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import { normalizePosting } from "../src/detector/normalize.js";
 import { evaluate } from "../src/detector/engine.js";
+import { analyzePosting } from "../src/detector/index.js";
 import { RULES_BY_ID, ALL_RULES } from "../src/detector/rules.js";
 
 // Run a single rule against raw text; returns the fired signal or null.
@@ -133,6 +134,19 @@ test("evaluate exposes distinct categories", () => {
   assert.ok(v.categories.includes("payment"));
   assert.ok(v.categories.includes("contact"));
   assert.ok(v.categories.includes("scope"));
+});
+
+// Regression: stateful /g regexes in normalize.js made the same posting gain
+// or lose the 28-point off_platform_contact flag between consecutive scoring
+// calls in a long-running process (e.g. the API server).
+test("scoring the same posting repeatedly yields identical verdicts", () => {
+  const text =
+    "Great gig! Contact me on WhatsApp or telegram @quick_hire to start today, budget $500.";
+  const first = analyzePosting(text).verdict;
+  for (let i = 0; i < 5; i++) {
+    assert.deepEqual(analyzePosting(text).verdict, first);
+  }
+  assert.ok(first.signals.some((s) => s.id === "off_platform_contact"));
 });
 
 test("evaluate accepts a custom rule subset", () => {

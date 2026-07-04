@@ -48,3 +48,38 @@ test("hasOffPlatformContact is true when contact info present", () => {
   assert.equal(normalizePosting("email me at a@b.com").hasOffPlatformContact, true);
   assert.equal(normalizePosting("apply via the platform").hasOffPlatformContact, false);
 });
+
+// Regression: WHATSAPP_RE/TELEGRAM_RE used to carry the /g flag, so .test()
+// kept lastIndex state between calls and identical input produced different
+// results on consecutive calls (e.g. mentionsWhatsApp true, then false).
+test("normalizePosting is deterministic across repeated calls", () => {
+  const input = "contact me on whatsapp or a@b.com";
+  const first = normalizePosting(input);
+  for (let i = 0; i < 5; i++) {
+    assert.deepEqual(normalizePosting(input), first);
+  }
+  assert.equal(first.mentionsWhatsApp, true);
+  assert.equal(first.hasOffPlatformContact, true);
+});
+
+// Regression: the second .test() inside a single normalizePosting call used
+// to consume the /g regex state, so a pure-WhatsApp posting came back with
+// hasOffPlatformContact false even on the first call.
+test("hasOffPlatformContact is true for a whatsapp-only posting, repeatedly", () => {
+  for (let i = 0; i < 3; i++) {
+    const p = normalizePosting("message me on WhatsApp");
+    assert.equal(p.mentionsWhatsApp, true);
+    assert.equal(p.hasOffPlatformContact, true);
+  }
+});
+
+// Regression: TELEGRAM_RE's "@handle" branch used to match the domain part of
+// every email address, mislabelling emails as Telegram mentions.
+test("an email address does not count as a telegram mention", () => {
+  const p = normalizePosting("email me at test@gmail.com");
+  assert.equal(p.mentionsTelegram, false);
+  assert.deepEqual(p.emails, ["test@gmail.com"]);
+  // ...but a standalone @handle still does
+  assert.equal(normalizePosting("message @scam_handle on telegram alt").mentionsTelegram, true);
+  assert.equal(normalizePosting("dm @scam_handle for details").mentionsTelegram, true);
+});
